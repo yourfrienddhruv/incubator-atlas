@@ -6,9 +6,9 @@
  * to you under the Apache License, Version 2.0 (the
  * "License"); you may not use this file except in compliance
  * with the License.  You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
+ * <p>
+ * http://www.apache.org/licenses/LICENSE-2.0
+ * <p>
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -22,6 +22,8 @@ import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
 
+import groovy.lang.Binding;
+import groovy.util.GroovyScriptEngine;
 import org.apache.atlas.ApplicationProperties;
 import org.apache.atlas.AtlasClient;
 import org.apache.atlas.AtlasException;
@@ -81,7 +83,7 @@ public class QuickStart {
         quickStart.createEntities();
 
         // Shows some search queries using DSL based on types
-        quickStart.search();
+        //quickStart.search();
     }
 
     static String getServerUrl(String[] args) throws AtlasException {
@@ -112,7 +114,7 @@ public class QuickStart {
 
     private final AtlasClient metadataServiceClient;
 
-    QuickStart(String baseUrl) {
+    public QuickStart(String baseUrl) {
         String[] urls = baseUrl.split(",");
         metadataServiceClient = new AtlasClient(null, null, urls);
     }
@@ -172,7 +174,7 @@ public class QuickStart {
                         new AttributeDefinition("inputTables", DataTypes.arrayTypeName(TABLE_TYPE),
                                 Multiplicity.COLLECTION, false, null));
 
-        HierarchicalTypeDefinition<TraitType> dimTraitDef = TypesUtil.createTraitTypeDef("Dimension",  "Dimension Trait", null);
+        HierarchicalTypeDefinition<TraitType> dimTraitDef = TypesUtil.createTraitTypeDef("Dimension", "Dimension Trait", null);
 
         HierarchicalTypeDefinition<TraitType> factTraitDef = TypesUtil.createTraitTypeDef("Fact", "Fact Trait", null);
 
@@ -184,7 +186,7 @@ public class QuickStart {
 
         HierarchicalTypeDefinition<TraitType> jdbcTraitDef = TypesUtil.createTraitTypeDef("JdbcAccess", "JdbcAccess Trait", null);
 
-        HierarchicalTypeDefinition<TraitType> logTraitDef = TypesUtil.createTraitTypeDef("Log Data", "LogData Trait",  null);
+        HierarchicalTypeDefinition<TraitType> logTraitDef = TypesUtil.createTraitTypeDef("Log Data", "LogData Trait", null);
 
         return TypesUtil.getTypesDef(ImmutableList.<EnumTypeDefinition>of(), ImmutableList.<StructTypeDefinition>of(),
                 ImmutableList.of(dimTraitDef, factTraitDef, piiTraitDef, metricTraitDef, etlTraitDef, jdbcTraitDef, logTraitDef),
@@ -200,91 +202,21 @@ public class QuickStart {
     }
 
     AttributeDefinition attrDef(String name, IDataType dT, Multiplicity m, boolean isComposite,
-            String reverseAttributeName) {
+                                String reverseAttributeName) {
         Preconditions.checkNotNull(name);
         Preconditions.checkNotNull(dT);
         return new AttributeDefinition(name, dT.getName(), m, isComposite, reverseAttributeName);
     }
 
     void createEntities() throws Exception {
-        Id salesDB = database(SALES_DB, SALES_DB_DESCRIPTION, "John ETL", "hdfs://host:8000/apps/warehouse/sales");
+        Binding binding = new Binding();
+        String file = "createEntities.groovy";
+        String path = QuickStart.class.getClassLoader().getResource(".").toString();
+        System.out.println("finding createEntities.groovy at " + path);
+        GroovyScriptEngine engine = new GroovyScriptEngine(new String[]{});
 
+        Object externalized = engine.run(file, binding);
 
-        Referenceable sd =
-                rawStorageDescriptor("hdfs://host:8000/apps/warehouse/sales", "TextInputFormat", "TextOutputFormat",
-                        true);
-
-        List<Referenceable> salesFactColumns = ImmutableList
-                .of(rawColumn(TIME_ID_COLUMN, "int", "time id"), rawColumn("product_id", "int", "product id"),
-                        rawColumn("customer_id", "int", "customer id", "PII"),
-                        rawColumn("sales", "double", "product id", "Metric"));
-
-        List<Referenceable> logFactColumns = ImmutableList
-                .of(rawColumn("time_id", "int", "time id"), rawColumn("app_id", "int", "app id"),
-                        rawColumn("machine_id", "int", "machine id"), rawColumn("log", "string", "log data", "Log Data"));
-
-        Id salesFact = table(SALES_FACT_TABLE, SALES_FACT_TABLE_DESCRIPTION, salesDB, sd, "Joe", "Managed",
-                salesFactColumns, FACT_TRAIT);
-
-        List<Referenceable> productDimColumns = ImmutableList
-                .of(rawColumn("product_id", "int", "product id"), rawColumn("product_name", "string", "product name"),
-                        rawColumn("brand_name", "int", "brand name"));
-
-        Id productDim =
-                table(PRODUCT_DIM_TABLE, "product dimension table", salesDB, sd, "John Doe", "Managed",
-                        productDimColumns, "Dimension");
-
-        List<Referenceable> timeDimColumns = ImmutableList
-                .of(rawColumn("time_id", "int", "time id"), rawColumn("dayOfYear", "int", "day Of Year"),
-                        rawColumn("weekDay", "int", "week Day"));
-
-        Id timeDim = table(TIME_DIM_TABLE, "time dimension table", salesDB, sd, "John Doe", "External", timeDimColumns,
-                "Dimension");
-
-
-        List<Referenceable> customerDimColumns = ImmutableList.of(rawColumn("customer_id", "int", "customer id", "PII"),
-                rawColumn("name", "string", "customer name", "PII"),
-                rawColumn("address", "string", "customer address", "PII"));
-
-        Id customerDim =
-                table("customer_dim", "customer dimension table", salesDB, sd, "fetl", "External", customerDimColumns,
-                        "Dimension");
-
-
-        Id reportingDB =
-                database("Reporting", "reporting database", "Jane BI", "hdfs://host:8000/apps/warehouse/reporting");
-
-        Id logDB = database("Logging", "logging database", "Tim ETL", "hdfs://host:8000/apps/warehouse/logging");
-
-        Id salesFactDaily =
-                table(SALES_FACT_DAILY_MV_TABLE, "sales fact daily materialized view", reportingDB, sd, "Joe BI",
-                        "Managed", salesFactColumns, "Metric");
-
-        Id loggingFactDaily =
-                table("log_fact_daily_mv", "log fact daily materialized view", logDB, sd, "Tim ETL", "Managed",
-                        logFactColumns, "Log Data");
-
-        loadProcess(LOAD_SALES_DAILY_PROCESS, LOAD_SALES_DAILY_PROCESS_DESCRIPTION, "John ETL",
-                ImmutableList.of(salesFact, timeDim),
-                ImmutableList.of(salesFactDaily), "create table as select ", "plan", "id", "graph", "ETL");
-
-        view(PRODUCT_DIM_VIEW, reportingDB, ImmutableList.of(productDim), "Dimension", "JdbcAccess");
-
-        view("customer_dim_view", reportingDB, ImmutableList.of(customerDim), "Dimension", "JdbcAccess");
-
-        Id salesFactMonthly =
-                table("sales_fact_monthly_mv", "sales fact monthly materialized view", reportingDB, sd, "Jane BI",
-                        "Managed", salesFactColumns, "Metric");
-
-        loadProcess("loadSalesMonthly", "hive query for monthly summary", "John ETL", ImmutableList.of(salesFactDaily),
-                ImmutableList.of(salesFactMonthly), "create table as select ", "plan", "id", "graph", "ETL");
-
-        Id loggingFactMonthly =
-                table("logging_fact_monthly_mv", "logging fact monthly materialized view", logDB, sd, "Tim ETL",
-                        "Managed", logFactColumns, "Log Data");
-
-        loadProcess("loadLogsMonthly", "hive query for monthly summary", "Tim ETL", ImmutableList.of(loggingFactDaily),
-                ImmutableList.of(loggingFactMonthly), "create table as select ", "plan", "id", "graph", "ETL");
     }
 
     private Id createInstance(Referenceable referenceable) throws Exception {
@@ -296,12 +228,12 @@ public class QuickStart {
         System.out.println("created instance for type " + typeName + ", guid: " + guids);
 
         // return the Id for created instance with guid
-        return new Id(guids.getString(guids.length()-1), referenceable.getId().getVersion(),
+        return new Id(guids.getString(guids.length() - 1), referenceable.getId().getVersion(),
                 referenceable.getTypeName());
     }
 
     Id database(String name, String description, String owner, String locationUri, String... traitNames)
-    throws Exception {
+            throws Exception {
         Referenceable referenceable = new Referenceable(DATABASE_TYPE, traitNames);
         referenceable.set("name", name);
         referenceable.set("description", description);
@@ -313,7 +245,7 @@ public class QuickStart {
     }
 
     Referenceable rawStorageDescriptor(String location, String inputFormat, String outputFormat, boolean compressed)
-    throws Exception {
+            throws Exception {
         Referenceable referenceable = new Referenceable(STORAGE_DESC_TYPE);
         referenceable.set("location", location);
         referenceable.set("inputFormat", inputFormat);
@@ -333,7 +265,7 @@ public class QuickStart {
     }
 
     Id table(String name, String description, Id dbId, Referenceable sd, String owner, String tableType,
-            List<Referenceable> columns, String... traitNames) throws Exception {
+             List<Referenceable> columns, String... traitNames) throws Exception {
         Referenceable referenceable = new Referenceable(TABLE_TYPE, traitNames);
         referenceable.set("name", name);
         referenceable.set("description", description);
@@ -350,11 +282,12 @@ public class QuickStart {
     }
 
     Id loadProcess(String name, String description, String user, List<Id> inputTables, List<Id> outputTables,
-            String queryText, String queryPlan, String queryId, String queryGraph, String... traitNames)
-    throws Exception {
+                   String queryText, String queryPlan, String queryId, String queryGraph, String... traitNames)
+            throws Exception {
         Referenceable referenceable = new Referenceable(LOAD_PROCESS_TYPE, traitNames);
         // super type attributes
-        referenceable.set("name", name);
+        referenceable.set(AtlasClient.NAME, name);
+        referenceable.set(AtlasClient.REFERENCEABLE_ATTRIBUTE_NAME, name);
         referenceable.set("description", description);
         referenceable.set(INPUTS_ATTRIBUTE, inputTables);
         referenceable.set(OUTPUTS_ATTRIBUTE, outputTables);
