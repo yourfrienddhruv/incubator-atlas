@@ -124,7 +124,7 @@ public class QuickStart {
             {DATABASE_TYPE, TABLE_TYPE, STORAGE_DESC_TYPE, COLUMN_TYPE, LOAD_PROCESS_TYPE, VIEW_TYPE, "JdbcAccess",
                     "ETL", "Metric", "PII", "Fact", "Dimension", "Log Data"};
 
-    private final AtlasClient metadataServiceClient;
+    protected final AtlasClient metadataServiceClient;
 
     public QuickStart(String baseUrl) {
         String[] urls = baseUrl.split(",");
