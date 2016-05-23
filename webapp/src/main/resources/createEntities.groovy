@@ -121,6 +121,6 @@ class ToBeCreatedEntities extends QuickStart {
     }
 }
 
-//new ToBeCreatedEntities("http://localhost:21000").createEntities();
-new ToBeCreatedEntities("http://10.40.10.147:21000").createEntities();
+new ToBeCreatedEntities("http://localhost:21000").createEntities();
+//Her new ToBeCreatedEntities("http://10.40.10.147:21000").createEntities();
 print "Atlas database populated"
