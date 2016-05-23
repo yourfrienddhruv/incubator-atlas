@@ -43,8 +43,11 @@ import org.apache.atlas.typesystem.types.StructTypeDefinition;
 import org.apache.atlas.typesystem.types.TraitType;
 import org.apache.atlas.typesystem.types.utils.TypesUtil;
 import org.apache.commons.configuration.Configuration;
+import org.apache.commons.lang3.StringUtils;
 import org.codehaus.jettison.json.JSONArray;
+import org.junit.Assert;
 
+import java.io.File;
 import java.util.List;
 
 /**
@@ -76,11 +79,20 @@ public class QuickStart {
         String baseUrl = getServerUrl(args);
         QuickStart quickStart = new QuickStart(baseUrl);
 
+        Binding binding = new Binding();
+        String file = "createEntities.groovy";
+        String path = StringUtils.substringBeforeLast(QuickStart.class.getClassLoader().getResource(file).getPath(),"/");
+        //Assert.assertTrue(file + " Must be located at "+path , new File(path+'/'+file).exists());
+
         // Shows how to create types in Atlas for your meta model
         quickStart.createTypes();
 
         // Shows how to create entities (instances) for the added types in Atlas
-        quickStart.createEntities();
+        //quickStart.createEntities();
+        System.out.println("finding createEntities.groovy at " + path);
+        GroovyScriptEngine engine = new GroovyScriptEngine(new String[]{QuickStart.class.getClassLoader().getResource(file).getPath()});
+        Object externalized = engine.run(file, binding);
+
 
         // Shows some search queries using DSL based on types
         //quickStart.search();
@@ -209,13 +221,6 @@ public class QuickStart {
     }
 
     void createEntities() throws Exception {
-        Binding binding = new Binding();
-        String file = "createEntities.groovy";
-        String path = QuickStart.class.getClassLoader().getResource(".").toString();
-        System.out.println("finding createEntities.groovy at " + path);
-        GroovyScriptEngine engine = new GroovyScriptEngine(new String[]{});
-
-        Object externalized = engine.run(file, binding);
 
     }
 
